@@ -1,0 +1,66 @@
+getgenv().ScriptName = "🌚"
+getgenv().Avatar = "🌚"
+
+if not urls then urls = {} end
+urls.Owner = getgenv().Avatar
+
+if _ENV.rz_error_message then
+	_ENV.rz_error_message:Destroy()
+end
+
+local identifyexecutor = identifyexecutor or (function() return (getgenv().ScriptName or "Unknown") end)
+
+local function CreateMessageError(Text)
+	_ENV.loadedFarm = nil
+	_ENV.OnFarm = false
+
+	local Message = Instance.new("Message", workspace)
+	Message.Text = string.gsub(Text, urls.Owner, "")
+	_ENV.rz_error_message = Message
+
+	error(Text, 2)
+end
+
+local function formatUrl(Url)
+	for key, path in urls do
+		if Url:find("{" .. key .. "}") then
+			return Url:gsub("{" .. key .. "}", path)
+		end
+	end
+	return Url
+end
+
+function fetcher.get(Url)
+	local success, response = pcall(function()
+		return game:HttpGet(formatUrl(Url))
+	end)
+	if success then
+		return response
+	else
+		CreateMessageError(string.format("[1] [%s] failed to get http/url/raw: %s\n>>%s<<", identifyexecutor(), Url, tostring(response)))
+	end
+end
+
+function fetcher.load(Url: string, concat: string?)
+	local raw = fetcher.get(Url) .. (if concat then concat else "")
+	local runFunction, errorText = loadstring(raw)
+	if type(runFunction) ~= "function" then
+		CreateMessageError(string.format("[2] [%s] sintax error: %s\n>>%s<<", identifyexecutor(), Url, tostring(errorText)))
+	else
+		return runFunction
+	end
+end
+
+local function IsPlace(Script)
+	if Script.PlacesIds and table.find(Script.PlacesIds, game.PlaceId) then
+		return true
+	elseif Script.GameId and Script.GameId == game.GameId then
+		return true
+	end
+end
+
+for _, Script in Scripts do
+	if IsPlace(Script) then
+		return fetcher.load("{Repository}Games/" .. Script.UrlPath)(fetcher, ...)
+	end
+end
